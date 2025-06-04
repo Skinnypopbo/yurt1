@@ -1,0 +1,230 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({
+   Name = "KATHUB",
+   Icon = 0, -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
+   LoadingTitle = "KATHUB",
+   LoadingSubtitle = "by Salty",
+   Theme = "Default", -- Check https://docs.sirius.menu/rayfield/configuration/themes
+
+   ToggleUIKeybind = "K", -- The keybind to toggle the UI visibility (string like "K" or Enum.KeyCode)
+
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false, -- Prevents Rayfield from warning when the script has a version mismatch with the interface
+
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = nil, -- Create a custom folder for your hub/game
+      FileName = "Big Hub"
+   },
+
+   Discord = {
+      Enabled = true, -- Prompt the user to join your Discord server if their executor supports it
+      Invite = "VsTP5vzK", -- The Discord invite code, do not include discord.gg/. E.g. discord.gg/ ABCD would be ABCD
+      RememberJoins = true -- Set this to false to make them join the discord every time they load it up
+   },
+
+   KeySystem = false, -- Set this to true to use our key system
+   KeySettings = {
+      Title = "Untitled",
+      Subtitle = "Key System",
+      Note = "No method of obtaining the key is provided", -- Use this to tell the user how to get a key
+      FileName = "Key", -- It is recommended to use something unique as other scripts using Rayfield may overwrite your key file
+      SaveKey = true, -- The user's key will be saved, but if you change the key, they will be unable to use your script
+      GrabKeyFromSite = false, -- If this is true, set Key below to the RAW site you would like Rayfield to get the key from
+      Key = {"Hello"} -- List of keys that will be accepted by the system, can be RAW file links (pastebin, github etc) or simple strings ("hello","key22")
+   }
+})
+
+-- Variables
+local aimbotEnabled = false
+local aimAtPart = "HumanoidRootPart"
+local wallCheckEnabled = false
+local targetNPCs = false
+local teamCheckEnabled = false
+local headSizeEnabled = false
+local espEnabled = false
+
+
+
+local Tab = Window:CreateTab("Main", 4483362458) -- Title, Image
+
+local Section = Tab:CreateSection("Aimbot")
+
+
+local function getClosestTarget()
+    local Cam = workspace.CurrentCamera
+    local Players = game:GetService("Players")
+    local localPlayer = Players.LocalPlayer
+    local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+    local localRoot = character:WaitForChild("HumanoidRootPart")
+    local nearestTarget = nil
+    local shortestDistance = math.huge
+ 
+    local function checkTarget(target)
+        if target and target:IsA("Model") and target:FindFirstChild("Humanoid") and target:FindFirstChild(aimAtPart) then
+            local targetRoot = target[aimAtPart]
+            local distance = (targetRoot.Position - localRoot.Position).Magnitude
+ 
+            if distance < shortestDistance then
+                if wallCheckEnabled then
+                    local rayDirection = (targetRoot.Position - Cam.CFrame.Position).Unit * 1000
+                    local raycastParams = RaycastParams.new()
+                    raycastParams.FilterDescendantsInstances = {character}
+                    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+ 
+                    local raycastResult = workspace:Raycast(Cam.CFrame.Position, rayDirection, raycastParams)
+ 
+                    if raycastResult and raycastResult.Instance:IsDescendantOf(target) then
+                        shortestDistance = distance
+                        nearestTarget = target
+                    end
+                else
+                    shortestDistance = distance
+                    nearestTarget = target
+                end
+            end
+        end
+    end
+ 
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= localPlayer and (not teamCheckEnabled or player.Team ~= localPlayer.Team) then
+            checkTarget(player.Character)
+        end
+    end
+ 
+    if targetNPCs then
+        for _, npc in pairs(workspace:GetDescendants()) do
+            checkTarget(npc)
+        end
+    end
+ 
+    return nearestTarget
+end
+ 
+local function lookAt(targetPosition)
+    local Cam = workspace.CurrentCamera
+    if targetPosition then
+        Cam.CFrame = CFrame.new(Cam.CFrame.Position, targetPosition)
+    end
+end
+ 
+local function aimAtTarget()
+    local runService = game:GetService("RunService")
+    local connection
+    connection = runService.RenderStepped:Connect(function()
+        if not aimbotEnabled then
+            connection:Disconnect()
+            return
+        end
+ 
+        local closestTarget = getClosestTarget()
+        if closestTarget and closestTarget:FindFirstChild(aimAtPart) then
+            local targetRoot = closestTarget[aimAtPart]
+ 
+            while aimbotEnabled and closestTarget and closestTarget:FindFirstChild(aimAtPart) and closestTarget.Humanoid.Health > 0 do
+                lookAt(targetRoot.Position)
+                local rayDirection = (targetRoot.Position - workspace.CurrentCamera.CFrame.Position).Unit * 1000
+                local raycastParams = RaycastParams.new()
+                raycastParams.FilterDescendantsInstances = {character}
+                raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+ 
+                local raycastResult = workspace:Raycast(workspace.CurrentCamera.CFrame.Position, rayDirection, raycastParams)
+ 
+                if not raycastResult or not raycastResult.Instance:IsDescendantOf(closestTarget) then
+                    break
+                end
+ 
+                runService.RenderStepped:Wait()
+            end
+        end
+    end)
+end
+ 
+
+local Toggle = Tab:CreateToggle({
+   Name = "Aimbot",
+   CurrentValue = false,
+   Flag = "Toggle1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+ aimbotEnabled = Value
+        if aimbotEnabled then
+            aimAtTarget()
+        end
+   end,
+})
+
+local Toggle = Tab:CreateToggle({
+   Name = "TeamCheck",
+   CurrentValue = false,
+   Flag = "Toggle1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+        teamCheckEnabled = Value
+   end,
+})
+
+local Toggle = Tab:CreateToggle({
+   Name = "WallCheck",
+   CurrentValue = false,
+   Flag = "Toggle1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+        wallCheckEnabled = Value
+   end,
+})
+
+local Section = Tab:CreateSection("ESP")
+
+local function createESP()
+    for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+        if player ~= game.Players.LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            local head = player.Character.Head
+            local billboard = Instance.new("BillboardGui")
+            billboard.Adornee = head
+            billboard.Size = UDim2.new(0, 100, 0, 50)
+            billboard.StudsOffset = Vector3.new(0, 2, 0)
+            billboard.AlwaysOnTop = true
+ 
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Parent = billboard
+            textLabel.Size = UDim2.new(1, 0, 1, 0)
+            textLabel.Text = player.Name
+            textLabel.BackgroundTransparency = 1
+            textLabel.TextStrokeTransparency = 0
+            textLabel.TextScaled = true
+ 
+            if player.Team then
+                textLabel.TextColor3 = player.Team.TeamColor.Color
+            else
+                textLabel.TextColor3 = Color3.new(1, 1, 1)
+            end
+ 
+            billboard.Parent = head
+        end
+    end
+end
+ 
+local function removeESP()
+    for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+        if player.Character and player.Character:FindFirstChild("Head") then
+            for _, child in pairs(player.Character.Head:GetChildren()) do
+                if child:IsA("BillboardGui") then
+                    child:Destroy()
+                end
+            end
+        end
+    end
+end
+
+local Toggle = Tab:CreateToggle({
+   Name = "ESP",
+   CurrentValue = false,
+   Flag = "Toggle1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+        espEnabled = Value
+        if espEnabled then
+            createESP()
+        else
+            removeESP()
+        end
+   end,
+})
+
